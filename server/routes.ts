@@ -55,7 +55,14 @@ const registrationLimiter = rateLimit({
 });
 
 // CSRF protection middleware (session-based, no cookies)
-const csrfProtection = csrf({ cookie: false });
+// Token can be sent in X-CSRF-Token header or _csrf body field
+const csrfProtection = csrf({ 
+  cookie: false,
+  value: (req) => {
+    // Check header first (for file uploads), then body
+    return req.headers['x-csrf-token'] as string || req.body?._csrf;
+  }
+});
 
 // Auth middleware
 function requireAuth(req: Request, res: Response, next: Function) {
@@ -322,7 +329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin logout
-  app.post("/api/auth/logout", requireAuth, (req: Request, res: Response) => {
+  app.post("/api/auth/logout", requireAuth, csrfProtection, (req: Request, res: Response) => {
     req.session?.destroy((err) => {
       if (err) {
         return res.status(500).json({ error: "Logout failed" });
@@ -343,7 +350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update team status (verify/reject)
-  app.patch("/api/admin/teams/:id/status", requireAuth, async (req: Request, res: Response) => {
+  app.patch("/api/admin/teams/:id/status", requireAuth, csrfProtection, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const { status, note } = updateTeamStatusSchema.parse(req.body);
@@ -455,7 +462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update admin settings
-  app.post("/api/admin/settings", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/admin/settings", requireAuth, csrfProtection, async (req: Request, res: Response) => {
     try {
       const updates = req.body;
 
@@ -473,7 +480,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Upload payment QR code
-  app.post("/api/admin/upload-qr", requireAuth, upload.single("file"), async (req: Request, res: Response) => {
+  app.post("/api/admin/upload-qr", requireAuth, csrfProtection, upload.single("file"), async (req: Request, res: Response) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "File is required" });
