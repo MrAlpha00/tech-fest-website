@@ -10,6 +10,7 @@ import { createEvent } from "ics";
 import multer from "multer";
 import session from "express-session";
 import rateLimit from "express-rate-limit";
+import csrf from "@dr.pogodin/csurf";
 
 // Configure Cloudinary
 cloudinary.config({
@@ -52,6 +53,9 @@ const registrationLimiter = rateLimit({
   max: 5, // 5 registrations per hour per IP
   message: "Too many registration attempts, please try again later.",
 });
+
+// CSRF protection middleware (session-based, no cookies)
+const csrfProtection = csrf({ cookie: false });
 
 // Auth middleware
 function requireAuth(req: Request, res: Response, next: Function) {
@@ -280,7 +284,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ADMIN ROUTES
 
-  // Admin login
+  // Get CSRF token (for authenticated sessions)
+  app.get("/api/auth/csrf", requireAuth, csrfProtection, (req: Request, res: Response) => {
+    res.json({ csrfToken: req.csrfToken() });
+  });
+
+  // Admin login - CSRF not required for login itself
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     try {
       const { email, password } = loginSchema.parse(req.body);
@@ -298,7 +307,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session!.adminId = admin.id;
       req.session!.adminEmail = admin.email;
 
-      res.json({ message: "Login successful" });
+      // After session is established, generate and return CSRF token
+      // We need to call csrfProtection middleware to initialize the token
+      csrfProtection(req, res, () => {
+        res.json({ message: "Login successful", csrfToken: req.csrfToken() });
+      });
     } catch (error) {
       if (error instanceof ZodError) {
         return res.status(400).json({ error: "Invalid input" });
