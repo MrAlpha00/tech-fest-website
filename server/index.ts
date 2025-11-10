@@ -4,6 +4,9 @@ import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 
+// Trust proxy for rate limiting to work correctly behind Replit's proxy
+app.set("trust proxy", 1);
+
 declare module 'http' {
   interface IncomingMessage {
     rawBody: unknown
