@@ -29,9 +29,16 @@ export default function AdminLogin() {
     onSuccess: async (response) => {
       // Extract and store CSRF token from login response
       const data = await response.json();
-      if (data.csrfToken) {
-        setCsrfToken(data.csrfToken);
+      if (!data.csrfToken) {
+        toast({
+          title: "Login Failed",
+          description: "Server did not provide security token. Please try again.",
+          variant: "destructive",
+        });
+        return;
       }
+      
+      setCsrfToken(data.csrfToken);
       
       toast({
         title: "Login Successful",

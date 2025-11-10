@@ -4,7 +4,17 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 let csrfToken: string | null = null;
 
 export function setCsrfToken(token: string | null) {
+  // Validate token before setting
+  if (token !== null && typeof token !== "string") {
+    console.error("Invalid CSRF token type:", typeof token);
+    return;
+  }
+  if (token !== null && token.trim() === "") {
+    console.error("Empty CSRF token received");
+    return;
+  }
   csrfToken = token;
+  console.log("CSRF token updated:", token ? "✓" : "cleared");
 }
 
 export function getCsrfToken(): string | null {
@@ -45,17 +55,28 @@ export async function apiRequest(
   // Handle CSRF token expiration - fetch new token and retry once
   if (res.status === 403 && retryOn403 && method !== "GET") {
     try {
+      console.log("CSRF token expired, fetching fresh token...");
       // Fetch fresh CSRF token
       const csrfRes = await fetch("/api/auth/csrf", { credentials: "include" });
       if (csrfRes.ok) {
-        const { csrfToken: newToken } = await csrfRes.json();
-        setCsrfToken(newToken);
+        const csrfData = await csrfRes.json();
+        if (!csrfData.csrfToken) {
+          console.error("CSRF token refresh response missing csrfToken field");
+          throw new Error("Invalid CSRF token response");
+        }
+        setCsrfToken(csrfData.csrfToken);
+        console.log("CSRF token refreshed, retrying request...");
         // Retry the original request with new token (no retry on second attempt)
         return apiRequest(method, url, data, false);
+      } else if (csrfRes.status === 401) {
+        console.error("Session expired during CSRF refresh - user needs to re-login");
+        setCsrfToken(null);
+        throw new Error("Session expired. Please login again.");
       }
     } catch (error) {
       // If token refresh fails, throw the original 403 error
       console.error("CSRF token refresh failed:", error);
+      throw error;
     }
   }
 
