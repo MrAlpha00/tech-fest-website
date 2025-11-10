@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, setCsrfToken } from "@/lib/queryClient";
 import { useDropzone } from "react-dropzone";
 
 export default function AdminSettings() {
@@ -89,6 +89,8 @@ export default function AdminSettings() {
   const logoutMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/auth/logout", {}),
     onSuccess: () => {
+      // Clear CSRF token on logout
+      setCsrfToken(null);
       navigate("/admin");
     },
   });

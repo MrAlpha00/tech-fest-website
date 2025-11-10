@@ -35,7 +35,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, setCsrfToken } from "@/lib/queryClient";
 import type { TeamWithMembers } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -81,6 +81,8 @@ export default function AdminDashboard() {
   const logoutMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/auth/logout", {}),
     onSuccess: () => {
+      // Clear CSRF token on logout
+      setCsrfToken(null);
       navigate("/admin");
     },
   });

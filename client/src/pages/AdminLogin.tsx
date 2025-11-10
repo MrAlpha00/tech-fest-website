@@ -10,7 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { loginSchema, type LoginInput } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, setCsrfToken } from "@/lib/queryClient";
 
 export default function AdminLogin() {
   const { toast } = useToast();
@@ -26,7 +26,13 @@ export default function AdminLogin() {
 
   const loginMutation = useMutation({
     mutationFn: (data: LoginInput) => apiRequest("POST", "/api/auth/login", data),
-    onSuccess: () => {
+    onSuccess: async (response) => {
+      // Extract and store CSRF token from login response
+      const data = await response.json();
+      if (data.csrfToken) {
+        setCsrfToken(data.csrfToken);
+      }
+      
       toast({
         title: "Login Successful",
         description: "Welcome to the admin dashboard",
