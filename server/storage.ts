@@ -28,8 +28,10 @@ export interface IStorage {
   createTeam(team: InsertTeam): Promise<Team>;
   getTeamById(id: string): Promise<Team | undefined>;
   getAllTeams(): Promise<TeamWithMembers[]>;
+  getGalleryTeams(): Promise<TeamWithMembers[]>;
   updateTeamStatus(id: string, status: "VERIFIED" | "REJECTED", note?: string, verifiedBy?: string): Promise<Team>;
   updateTeamQrCode(id: string, qrCodeUrl: string): Promise<void>;
+  toggleTeamGalleryVisibility(id: string, showInGallery: boolean): Promise<void>;
 
   // Member methods
   createMembers(teamId: string, members: InsertMember[]): Promise<Member[]>;
@@ -114,6 +116,30 @@ export class DatabaseStorage implements IStorage {
     await db
       .update(teams)
       .set({ qrCodeUrl })
+      .where(eq(teams.id, id));
+  }
+
+  async getGalleryTeams(): Promise<TeamWithMembers[]> {
+    const galleryTeams = await db
+      .select()
+      .from(teams)
+      .where(and(eq(teams.status, "VERIFIED"), eq(teams.showInGallery, true)))
+      .orderBy(desc(teams.verifiedAt));
+
+    const teamsWithMembers = await Promise.all(
+      galleryTeams.map(async (team) => {
+        const teamMembers = await this.getMembersByTeamId(team.id);
+        return { ...team, members: teamMembers };
+      })
+    );
+
+    return teamsWithMembers;
+  }
+
+  async toggleTeamGalleryVisibility(id: string, showInGallery: boolean): Promise<void> {
+    await db
+      .update(teams)
+      .set({ showInGallery, updatedAt: new Date() })
       .where(eq(teams.id, id));
   }
 

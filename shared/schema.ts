@@ -42,6 +42,7 @@ export const teams = pgTable("teams", {
   status: statusEnum("status").notNull().default("PENDING"),
   verificationNote: text("verification_note"),
   qrCodeUrl: text("qr_code_url"),
+  showInGallery: boolean("show_in_gallery").notNull().default(false),
   verifiedAt: timestamp("verified_at"),
   verifiedBy: text("verified_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -21,7 +21,7 @@ export function Navbar() {
     { href: "#tracks", label: "Tracks & Prizes" },
     { href: "#schedule", label: "Schedule" },
     { href: "#faq", label: "FAQ" },
-    { href: "#sponsors", label: "Sponsors" },
+    { href: "/gallery", label: "Gallery", isPage: true },
   ];
 
   return (
@@ -47,16 +47,27 @@ export function Navbar() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            {navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-                data-testid={`link-nav-${link.label.toLowerCase().replace(/\s/g, '-')}`}
-              >
-                {link.label}
-              </a>
-            ))}
+            {navLinks.map((link) =>
+              link.isPage ? (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  data-testid={`link-nav-${link.label.toLowerCase().replace(/\s/g, '-')}`}
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  data-testid={`link-nav-${link.label.toLowerCase().replace(/\s/g, '-')}`}
+                >
+                  {link.label}
+                </a>
+              )
+            )}
           </div>
 
           {/* CTA Buttons */}
@@ -89,16 +100,28 @@ export function Navbar() {
               exit={{ opacity: 0, height: 0 }}
               className="md:hidden mt-4 pb-4 space-y-3"
             >
-              {navLinks.map((link) => (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  className="block text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-2"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  {link.label}
-                </a>
-              ))}
+              {navLinks.map((link) =>
+                link.isPage ? (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <div className="block text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-2">
+                      {link.label}
+                    </div>
+                  </Link>
+                ) : (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    className="block text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-2"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    {link.label}
+                  </a>
+                )
+              )}
               <div className="flex flex-col gap-2 pt-2">
                 <Button asChild className="w-full bg-primary text-primary-foreground">
                   <Link href="/register" onClick={() => setIsMobileMenuOpen(false)}>Register Team</Link>

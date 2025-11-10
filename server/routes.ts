@@ -7,6 +7,7 @@ import { ZodError } from "zod";
 import { v2 as cloudinary } from "cloudinary";
 import QRCode from "qrcode";
 import { createEvent } from "ics";
+import { format } from "@fast-csv/format";
 import multer from "multer";
 import session from "express-session";
 import rateLimit from "express-rate-limit";
@@ -211,6 +212,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get gallery teams (public)
+  app.get("/api/gallery", async (req: Request, res: Response) => {
+    try {
+      const teams = await storage.getGalleryTeams();
+      res.json(teams);
+    } catch (error) {
+      console.error("Error fetching gallery teams:", error);
+      res.status(500).json({ error: "Failed to fetch gallery teams" });
+    }
+  });
+
   // Team registration
   app.post(
     "/api/register",
@@ -349,6 +361,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Export teams to CSV
+  app.get("/api/admin/export", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `innovate-x-teams-${timestamp}.csv`;
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      
+      const csvStream = format({ headers: true });
+      csvStream.pipe(res);
+      
+      const teams = await storage.getAllTeams();
+      
+      for (const team of teams) {
+        for (let i = 0; i < team.memberCount; i++) {
+          const member = team.members[i];
+          csvStream.write({
+            'Team ID': team.id,
+            'Team Name': team.teamName,
+            'Category': team.category,
+            'Project Title': team.projectTitle,
+            'Project Summary': team.projectSummary,
+            'College Name': team.collegeName,
+            'Mentor Name': team.mentorName || '',
+            'Mentor Email': team.mentorEmail || '',
+            'Contact Phone': team.contactPhone,
+            'Contact Email': team.contactEmail,
+            'Member Count': team.memberCount,
+            'Status': team.status,
+            'Verification Note': team.verificationNote || '',
+            'Verified At': team.verifiedAt ? team.verifiedAt.toISOString() : '',
+            'Verified By': team.verifiedBy || '',
+            'Created At': team.createdAt.toISOString(),
+            'Member Index': i + 1,
+            'Member Name': member?.fullName || '',
+            'Member Email': member?.email || '',
+            'Member Year': member?.year || '',
+            'Member Department': member?.department || '',
+          });
+        }
+      }
+      
+      csvStream.end();
+    } catch (error) {
+      console.error("Error exporting CSV:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to export CSV" });
+      }
+    }
+  });
+
   // Update team status (verify/reject)
   app.patch("/api/admin/teams/:id/status", requireAuth, csrfProtection, async (req: Request, res: Response) => {
     try {
@@ -443,6 +507,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error updating team status:", error);
       res.status(500).json({ error: "Failed to update team status" });
+    }
+  });
+
+  // Toggle team gallery visibility
+  app.patch("/api/admin/teams/:id/gallery", requireAuth, csrfProtection, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { showInGallery } = req.body;
+
+      const team = await storage.getTeamById(id);
+      if (!team) {
+        return res.status(404).json({ error: "Team not found" });
+      }
+
+      await storage.toggleTeamGalleryVisibility(id, showInGallery);
+
+      await storage.createAuditLog(
+        id,
+        showInGallery ? "GALLERY_ENABLED" : "GALLERY_DISABLED",
+        req.session!.adminEmail!,
+        `Gallery visibility ${showInGallery ? "enabled" : "disabled"}`
+      );
+
+      res.json({ message: "Gallery visibility updated" });
+    } catch (error) {
+      console.error("Error updating gallery visibility:", error);
+      res.status(500).json({ error: "Failed to update gallery visibility" });
     }
   });
 

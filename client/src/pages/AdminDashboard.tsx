@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import {
-  Users, Settings, LogOut, Search, Filter, Download, Eye, Check, X, FileText, Upload
+  Users, Settings, LogOut, Search, Filter, Download, Eye, Check, X, FileText, Upload, ImageIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient, setCsrfToken } from "@/lib/queryClient";
@@ -50,6 +51,9 @@ export default function AdminDashboard() {
   const [selectedTeam, setSelectedTeam] = useState<TeamWithMembers | null>(null);
   const [actionDialog, setActionDialog] = useState<{ type: "verify" | "reject"; team: TeamWithMembers } | null>(null);
   const [actionNote, setActionNote] = useState("");
+  const [selectedTeamIds, setSelectedTeamIds] = useState<Set<string>>(new Set());
+  const [bulkActionDialog, setBulkActionDialog] = useState<{ type: "verify" | "reject" } | null>(null);
+  const [bulkActionNote, setBulkActionNote] = useState("");
   const { toast } = useToast();
 
   const { data: teams = [], isLoading } = useQuery<TeamWithMembers[]>({
@@ -84,6 +88,60 @@ export default function AdminDashboard() {
       // Clear CSRF token on logout
       setCsrfToken(null);
       navigate("/admin");
+    },
+  });
+
+  const handleExport = async () => {
+    try {
+      const response = await fetch("/api/admin/export", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Export failed");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `innovate-x-teams-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Export Successful",
+        description: "Teams data has been exported to CSV.",
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Failed to export teams data.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const toggleGalleryMutation = useMutation({
+    mutationFn: async ({ teamId, showInGallery }: { teamId: string; showInGallery: boolean }) => {
+      return apiRequest("PATCH", `/api/admin/teams/${teamId}/gallery`, { showInGallery });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/teams"] });
+      toast({
+        title: "Gallery Updated",
+        description: "Team gallery visibility has been updated.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update gallery visibility.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -214,9 +272,9 @@ export default function AdminDashboard() {
                     </SelectContent>
                   </Select>
 
-                  <Button variant="outline" data-testid="button-export">
+                  <Button variant="outline" onClick={handleExport} data-testid="button-export">
                     <Download className="w-4 h-4 mr-2" />
-                    Export
+                    Export CSV
                   </Button>
                 </div>
               </CardContent>
@@ -276,6 +334,7 @@ export default function AdminDashboard() {
                         <TableHead>College</TableHead>
                         <TableHead>Members</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Gallery</TableHead>
                         <TableHead>Submitted</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
@@ -304,6 +363,25 @@ export default function AdminDashboard() {
                             >
                               {team.status}
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {team.status === "VERIFIED" ? (
+                              <div className="flex items-center gap-2">
+                                <Switch
+                                  checked={team.showInGallery}
+                                  onCheckedChange={(checked) => {
+                                    toggleGalleryMutation.mutate({ teamId: team.id, showInGallery: checked });
+                                  }}
+                                  data-testid={`switch-gallery-${team.id}`}
+                                  disabled={toggleGalleryMutation.isPending}
+                                />
+                                {team.showInGallery && (
+                                  <ImageIcon className="w-4 h-4 text-primary" />
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm">
                             {format(new Date(team.createdAt), "MMM d, yyyy")}
