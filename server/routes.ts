@@ -95,19 +95,25 @@ async function uploadToCloudinary(file: Express.Multer.File, folder: string): Pr
 // Send email via Brevo
 async function sendEmail(to: string[], subject: string, htmlContent: string, attachments?: any[]) {
   try {
+    const emailPayload: any = {
+      sender: { email: "noreply@innovatex.com", name: "Innovate-X Team" },
+      to: to.map((email) => ({ email })),
+      subject,
+      htmlContent,
+    };
+
+    // Only include attachment field if there are actual attachments
+    if (attachments && attachments.length > 0) {
+      emailPayload.attachment = attachments;
+    }
+
     const response = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "api-key": process.env.BREVO_API_KEY || "",
       },
-      body: JSON.stringify({
-        sender: { email: "noreply@innovatex.com", name: "Innovate-X Team" },
-        to: to.map((email) => ({ email })),
-        subject,
-        htmlContent,
-        attachment: attachments || [],
-      }),
+      body: JSON.stringify(emailPayload),
     });
 
     if (!response.ok) {

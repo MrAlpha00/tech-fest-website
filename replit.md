@@ -142,7 +142,33 @@ Preferred communication style: Simple, everyday language.
 - Drizzle Kit for database schema migrations
 - TypeScript compiler for type checking
 
-## Recent Changes (November 10, 2025)
+## Recent Changes
+
+### November 11, 2025 - Payment QR & Bot Protection Removal
+
+**1. Removed hCaptcha Bot Protection**
+   - Removed hCaptcha component from registration form
+   - Removed backend hCaptcha verification logic
+   - Relying on existing rate limiters for abuse protection:
+     - Registration endpoint: 5 requests per hour per IP
+     - General API: 100 requests per 15 minutes per IP
+   - Simplified registration flow for better user experience
+
+**2. Added Admin-Managed Payment QR System**
+   - Admin can upload payment QR code in Settings page
+   - QR uploaded to Cloudinary and stored as PAYMENT_QR_URL in eventSettings
+   - QR automatically displays in registration form "Uploads" step
+   - Shows before payment proof upload with clear instructions
+   - Fallback notice shown when QR not yet uploaded (directs to organizer email)
+   - Admin dropzone UI already existed in AdminSettings.tsx
+
+**Technical Implementation:**
+- Frontend: Registration form fetches payment QR from `/api/settings/public`
+- Backend: POST `/api/admin/upload-qr` endpoint uploads to Cloudinary
+- Conditional rendering: Shows QR if available, else shows contact notice
+- Settings invalidation ensures immediate QR visibility after admin upload
+
+## Previous Changes - November 10, 2025
 
 **New Features Implemented:**
 
