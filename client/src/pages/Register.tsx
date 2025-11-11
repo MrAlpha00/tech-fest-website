@@ -14,20 +14,28 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { registrationSchema, type RegistrationInput } from "@shared/schema";
 import { Navbar } from "@/components/Navbar";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import HCaptcha from "@hcaptcha/react-hcaptcha";
 import { useDropzone } from "react-dropzone";
 
 const STEPS = ["Team Details", "Members", "Uploads", "Review"];
 
 export default function Register() {
   const [currentStep, setCurrentStep] = useState(0);
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
   const [extraFile, setExtraFile] = useState<File | null>(null);
   const { toast } = useToast();
   const [, navigate] = useLocation();
+
+  // Fetch public settings for payment QR
+  const { data: publicSettings } = useQuery<Record<string, string>>({
+    queryKey: ["/api/settings/public"],
+    queryFn: async () => {
+      const response = await fetch("/api/settings/public");
+      if (!response.ok) throw new Error("Failed to fetch settings");
+      return response.json();
+    },
+  });
 
   const form = useForm<RegistrationInput>({
     resolver: zodResolver(registrationSchema),
@@ -92,7 +100,7 @@ export default function Register() {
   }, [memberCount]);
 
   const registrationMutation = useMutation({
-    mutationFn: async (data: RegistrationInput & { captchaToken: string; paymentFile: File; extraFile?: File }) => {
+    mutationFn: async (data: RegistrationInput & { paymentFile: File; extraFile?: File }) => {
       const formData = new FormData();
       formData.append("data", JSON.stringify({
         ...data,
@@ -103,7 +111,6 @@ export default function Register() {
       if (data.extraFile) {
         formData.append("extraFile", data.extraFile);
       }
-      formData.append("captchaToken", data.captchaToken);
 
       return apiRequest("POST", "/api/register", formData);
     },
@@ -125,14 +132,6 @@ export default function Register() {
   });
 
   const onSubmit = async (data: RegistrationInput) => {
-    if (!captchaToken) {
-      toast({
-        title: "Captcha Required",
-        description: "Please complete the captcha verification.",
-        variant: "destructive",
-      });
-      return;
-    }
     if (!paymentFile) {
       toast({
         title: "Payment Proof Required",
@@ -141,7 +140,7 @@ export default function Register() {
       });
       return;
     }
-    registrationMutation.mutate({ ...data, captchaToken, paymentFile, extraFile: extraFile || undefined });
+    registrationMutation.mutate({ ...data, paymentFile, extraFile: extraFile || undefined });
   };
 
   const nextStep = async () => {
@@ -596,23 +595,38 @@ export default function Register() {
                       exit={{ opacity: 0, x: -20 }}
                       className="space-y-6"
                     >
+                      {/* Payment QR Code */}
+                      {publicSettings?.PAYMENT_QR_URL ? (
+                        <div className="bg-muted/30 border border-primary/20 rounded-xl p-6">
+                          <Label className="mb-4 block text-lg font-semibold">Step 1: Scan QR to Pay Registration Fee</Label>
+                          <div className="flex flex-col items-center gap-4">
+                            <img 
+                              src={publicSettings.PAYMENT_QR_URL} 
+                              alt="Payment QR Code" 
+                              className="w-64 h-64 object-contain border-2 border-primary/30 rounded-lg"
+                              data-testid="img-payment-qr"
+                            />
+                            <p className="text-sm text-muted-foreground text-center">
+                              Scan this QR code to pay the registration fee, then upload your payment proof below.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-6">
+                          <p className="text-sm text-yellow-600 dark:text-yellow-400 text-center">
+                            Payment QR code not available yet. Please contact the organizers at Sm4686771@gmail.com for payment details.
+                          </p>
+                        </div>
+                      )}
+
                       <div>
-                        <Label className="mb-4 block">Payment Proof * (Required)</Label>
+                        <Label className="mb-4 block">Step 2: Upload Payment Proof * (Required)</Label>
                         <PaymentDropzone />
                       </div>
 
                       <div>
                         <Label className="mb-4 block">Supporting Document (Optional)</Label>
                         <ExtraDocDropzone />
-                      </div>
-
-                      <div>
-                        <Label className="mb-4 block">Verify you're human *</Label>
-                        <HCaptcha
-                          sitekey={import.meta.env.VITE_HCAPTCHA_SITE_KEY || ""}
-                          onVerify={(token) => setCaptchaToken(token)}
-                          onExpire={() => setCaptchaToken(null)}
-                        />
                       </div>
                     </motion.div>
                   )}

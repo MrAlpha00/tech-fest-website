@@ -90,21 +90,7 @@ async function uploadToCloudinary(file: Express.Multer.File, folder: string): Pr
   });
 }
 
-// Verify hCaptcha
-async function verifyHCaptcha(token: string): Promise<boolean> {
-  try {
-    const response = await fetch("https://api.hcaptcha.com/siteverify", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: `secret=${process.env.HCAPTCHA_SECRET_KEY}&response=${token}`,
-    });
-    const data = await response.json();
-    return data.success;
-  } catch (error) {
-    console.error("hCaptcha verification error:", error);
-    return false;
-  }
-}
+// Note: hCaptcha verification removed - relying on rate limiting for abuse protection
 
 // Send email via Brevo
 async function sendEmail(to: string[], subject: string, htmlContent: string, attachments?: any[]) {
@@ -234,17 +220,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: Request, res: Response) => {
       try {
         const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-        const { data: dataStr, captchaToken } = req.body;
+        const { data: dataStr } = req.body;
         const data = JSON.parse(dataStr);
 
         // Validate data
         const validatedData = registrationSchema.parse(data);
-
-        // Verify captcha
-        const captchaValid = await verifyHCaptcha(captchaToken);
-        if (!captchaValid) {
-          return res.status(400).json({ error: "Captcha verification failed" });
-        }
 
         // Upload payment proof
         if (!files.paymentFile || files.paymentFile.length === 0) {
